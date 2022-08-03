@@ -1,7 +1,7 @@
 #include <functional>
 #include <Arduino.h>
 #include <Wire.h>
-#include "FreeRTOS.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <esp32-hal-log.h>
 #include <EEPROM.h>

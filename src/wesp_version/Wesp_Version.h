@@ -1,7 +1,7 @@
 #ifndef WESP_VERSION_H
 #define WESP_VERSION_H
 
-#include "FreeRTOS.h"
+#include "freertos/FreeRTOS.h"
 
 enum Wesp_VersionBranch {
     UNKOWN = 0,
