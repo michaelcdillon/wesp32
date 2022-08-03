@@ -1,7 +1,7 @@
 #ifndef Wesp_GPS_H
 #define Wesp_GPS_H
 
-#include <FreeRTOS.h>
+#include "freertos/FreeRTOS.h"
 #include <SparkFun_Ublox_Arduino_Library.h>
 
 #define GPS_COORDS_DIVISOR 10000000.0

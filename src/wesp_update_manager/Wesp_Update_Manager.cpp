@@ -1,6 +1,6 @@
 #include "Wesp_Update_Manager.h"
+#include <Arduino.h>
 #include <string.h>
-#include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
@@ -84,7 +84,7 @@ void Wesp_Update_Manager_Class::init() {
 }
 
 bool Wesp_Update_Manager_Class::shouldUpdate() {
-    ESP_LOGI(TAG, "Checking if update should be performed for b: %d v: %d at %s", 
+    log_i("Checking if update should be performed for b: %d v: %d at %s", 
         this->updateFirmwareBranch, this->updateFirmwareVersion, this->updateFirmwareUrl);
     
     if (Wesp_Version.getBranch() == this->updateFirmwareBranch) {
