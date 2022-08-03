@@ -3,7 +3,7 @@
 
 class Wesp_Config_Class {
     private:
-        char deviceId[12];
+        char deviceId[13];
         char wxt[32];
         void setupDeviceId();
         void setupAnnounceMessages();
