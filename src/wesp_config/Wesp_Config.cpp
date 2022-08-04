@@ -25,6 +25,8 @@ void Wesp_Config_Class::setupAll() {
     this->setupDeviceId();
     this->setupWxTopic();
     log_i("wxt: %s", this->wxt);
+    this->setupWxLightningTopic();
+    log_i("wxlt: %s", this->wxlt);
     this->setupAnnounceMessages();
     log_i("announce on msg: %s", announceOnMsgJson);
 }
@@ -38,6 +40,10 @@ void Wesp_Config_Class::setupDeviceId() {
 
 void Wesp_Config_Class::setupWxTopic() {
     sprintf(this->wxt, "%s%s", WESP_STATION_WX_TOPIC_PREFIX, this->deviceId);
+}
+
+void Wesp_Config_Class::setupWxLightningTopic() {
+    sprintf(this->wxlt, "%s%s", WESP_STATION_WX_LIGHTNING_TOPIC_PREFIX, this->deviceId);
 }
 
 void Wesp_Config_Class::setupAnnounceMessages() {
@@ -67,6 +73,10 @@ const char* Wesp_Config_Class::getDeviceId() {
 
 const char* Wesp_Config_Class::getWxTopic() {
     return this->wxt;
+}
+
+const char* Wesp_Config_Class::getWxLightningTopic() {
+    return this->wxlt;
 }
 
 const char* Wesp_Config_Class::getAnnounceOffMessage() {

@@ -4,15 +4,18 @@
 class Wesp_Config_Class {
     private:
         char deviceId[13];
-        char wxt[32];
+        char wxt[34];
+        char wxlt[42];
         void setupDeviceId();
         void setupAnnounceMessages();
         void setupWxTopic();
+        void setupWxLightningTopic();
     public:
         Wesp_Config_Class();
         void setupAll();
         const char* getDeviceId();
         const char* getWxTopic();
+        const char* getWxLightningTopic();
         const char* getAnnounceOffMessage();
         const char* getAnnounceOnMessage();
         const char* getAnnounceStationTopic();

@@ -11,6 +11,7 @@
 #include "SparkFunBME280.h"
 #include "ArduinoJson.h"
 #include "wesp_gps/Wesp_GPS.h"
+#include "SparkFun_AS3935.h"
 
 #define SOIL_MST_PIN        (GPIO_NUM_34)     // MM A0 = ESP32 GPI34/ADC1:6
 #define SOIL_PWR_PIN        (GPIO_NUM_15)     // MM G0 = ESP32 GPIO15/ADC2:3
@@ -19,7 +20,8 @@
 #define WIND_DIR_PIN        (ADC1_CHANNEL_7)  // MM A1 = ESP32 GPI35/ADC1:7
 #define WIND_SPD_PIN        (GPIO_NUM_14)     // MM D0 = ESP32 GPIO14
 #define RAIN_PIN            (GPIO_NUM_27)     // MM D1 = ESP32 GPIO27
-#define LIGHTNING_ITR_PIN   (GPIO_NUM_17)     // MM G3 = ESP32 GPIO17
+#define LIGHTNING_ITR_PIN   (GPIO_NUM_17)     // MM G3/B3 = ESP32 GPIO17
+#define LIGHTNING_CS_PIN    (GPIO_NUM_25)     // MM G1/B1 = ESP32 GPIO17
 #define VIN_BATT_PIN        (ADC1_CHANNEL_3)  // MM BATT_VIN/3 = ESP32 GPI39/ADC1:3
 #define VIN_BATT_MULTIPLIER 3
 
@@ -56,6 +58,18 @@ typedef struct Wind_Dir {
     float dir_mv_min;
     float dir_mv_max;
 } Wind_Dir_t;
+
+enum Lightning_Event_Type {
+    LIGHTNING_E = 0x08,
+    DISTURBUER_E = 0x04,
+    NOISE_E = 0x01
+};
+
+typedef struct Lightning_Event {
+    Lightning_Event_Type type;
+    uint8_t distanceKm;
+    ulong energy;
+} Lightning_Event_t;
 
 extern const char* WindDirNiceToStr(Wind_Dir_Nice dir);
 extern void MonitorWeatherSensorInterruptsTask(void* arg);
@@ -112,6 +126,11 @@ class Wesp_Sensors_Class {
         uint32_t reportWeatherDataDelay;
         bool wakeAtmosphericWaitForMeasurement();
         void resetCountersForNewDay();
+        bool lightningSensorAvailable;
+        bool newLightningEventToSend;
+        Lightning_Event lastLightningEvent;
+        void setupLightningSensor();
+        void sendLightningEvent();
 
     public:
         Wesp_Sensors_Class();

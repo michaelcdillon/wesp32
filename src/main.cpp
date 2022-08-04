@@ -19,65 +19,69 @@
 //#include "wesp_wifi/Wesp_Wifi.h"
 
 void setup() {
-    Wesp_Config.setupAll();
-    // put your setup code here, to run once:
     Serial.begin(115200);
-    log_i("WESP32 Booting...");
-    log_i("Firmware Branch: %s", Wesp_Version.getBranchName());
-    log_i("Firmware Version: %d", Wesp_Version.getVersion());
-    log_i("Wesp Device Id: %s", Wesp_Config.getDeviceId());
-    log_d("setup is running on core: %d...", xPortGetCoreID());
 
-    Wire.begin();
-    Wire.setClock(400000);
-    Wesp_EEPROM.begin();
-
-    log_i("Starting wifi...");
-    log_i("Attempting to connect to wifi ssid: %s", Wesp_EEPROM.readWifiSSID().c_str());
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(Wesp_EEPROM.readWifiSSID().c_str(), Wesp_EEPROM.readWifiPasscode().c_str());
+    log_i("test");
     
-    //wesp_initialize_wifi();
+    // Wesp_Config.setupAll();
+    // // put your setup code here, to run once:
+    // log_i("WESP32 Booting...");
+    // log_i("Firmware Branch: %s", Wesp_Version.getBranchName());
+    // log_i("Firmware Version: %d", Wesp_Version.getVersion());
+    // log_i("Wesp Device Id: %s", Wesp_Config.getDeviceId());
+    // log_d("setup is running on core: %d...", xPortGetCoreID());
+
+    // Wire.begin();
+    // Wire.setClock(400000);
+    // SPI.begin();
+    // Wesp_EEPROM.begin();
+
+    // log_i("Starting wifi...");
+    // log_i("Attempting to connect to wifi ssid: %s", Wesp_EEPROM.readWifiSSID().c_str());
+    // WiFi.mode(WIFI_STA);
+    // WiFi.begin(Wesp_EEPROM.readWifiSSID().c_str(), Wesp_EEPROM.readWifiPasscode().c_str());
+    
+    // //wesp_initialize_wifi();
 
     
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        log_e("Failed to connect to to wifi");
-    }
-    else {
-        log_i("Connected to wifi, got ip: %s", WiFi.localIP().toString().c_str());
-    }
+    // if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    //     log_e("Failed to connect to to wifi");
+    // }
+    // else {
+    //     log_i("Connected to wifi, got ip: %s", WiFi.localIP().toString().c_str());
+    // }
 
-    log_i("Initializing mqtt...");
-    Wesp_MQTT.init(Wesp_Config.getMqttUri(), Wesp_Config.getMqttUsername(), Wesp_Config.getMqttPassword());
+    // log_i("Initializing mqtt...");
+    // Wesp_MQTT.init(Wesp_Config.getMqttUri(), Wesp_Config.getMqttUsername(), Wesp_Config.getMqttPassword());
 
-    log_i("Starting mqtt client...");
-    Wesp_MQTT.start();
+    // log_i("Starting mqtt client...");
+    // Wesp_MQTT.start();
 
-    Wesp_GPS.init();
-    if (Wesp_GPS.isPeripherialAvailable()) {
+    // Wesp_GPS.init();
+    // if (Wesp_GPS.isPeripherialAvailable()) {
 
-        bool gpsHasFix = Wesp_GPS.waitForFix(120 * 1000); // wait 2 min for fix    
+    //     bool gpsHasFix = Wesp_GPS.waitForFix(120 * 1000); // wait 2 min for fix    
 
-        if (!gpsHasFix) {
-            log_e("Waited 2 min, for gps fix, failed to acquire one, so restarting.");
-            //esp_restart();
-        }
+    //     if (!gpsHasFix) {
+    //         log_e("Waited 2 min, for gps fix, failed to acquire one, so restarting.");
+    //         //esp_restart();
+    //     }
 
-        // put GPS in powersave mode now.
-        Wesp_GPS.enablePowerSaveMode();
-    } 
-    else {
-        // look up a ntp server for current time
-        log_w("GPS is unavailable, using defaults of 0:00:00 for time. Consider spending time to look up ntp and get time.");
-    }
+    //     // put GPS in powersave mode now.
+    //     Wesp_GPS.enablePowerSaveMode();
+    // } 
+    // else {
+    //     // look up a ntp server for current time
+    //     log_w("GPS is unavailable, using defaults of 0:00:00 for time. Consider spending time to look up ntp and get time.");
+    // }
 
-    log_i("Initializing weather sensors.");
-    Wesp_Sensors.init(Wesp_GPS.updateAndFetchCurrentTime());
+    // log_i("Initializing weather sensors.");
+    // Wesp_Sensors.init(Wesp_GPS.updateAndFetchCurrentTime());
 
-    Tasks.init(false);
-    Tasks.startAllCritical();
-    Tasks.startAllSecondary();
-    Wesp_Webserver.start();
+    // Tasks.init(false);
+    // Tasks.startAllCritical();
+    // Tasks.startAllSecondary();
+    // Wesp_Webserver.start();
     log_i("Setup finished.");
 }
 

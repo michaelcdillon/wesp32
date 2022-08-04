@@ -95,7 +95,15 @@
 #define WIND_DIR_DEG_337_5_MV_MIN (CALC_WIND_DIR_DEG_MV_MIN(WIND_DIR_DEG_337_5_R, DEG_R_RESISTOR_TOLERANCE))
 #define WIND_DIR_DEG_337_5_MV_MAX (CALC_WIND_DIR_DEG_MV_MAX(WIND_DIR_DEG_337_5_R, DEG_R_RESISTOR_TOLERANCE))
 
+#define LIGHTNING_MASK_DISTURBERS true
+#define LIGHTNING_NOISE_FLOOR 2
+#define LIGHTNING_WATCH_DOG_VAL 2
+#define LIGHTNING_SPIKE 2
+#define LIGHTNING_THRESHOLD 1
+
 static esp_adc_cal_characteristics_t adc1_chars;
+
+SparkFun_AS3935 lightningSensor;
 
 Wind_Dir_t Wind_Dirs[NUM_WIND_DIRS] = {
     {
@@ -385,6 +393,8 @@ void Wesp_Sensors_Class::init(GPS_Timestamp_t ts) {
     ESP_ERROR_CHECK(adc1_config_channel_atten(WIND_DIR_PIN, ADC_ATTEN_11db));
     ESP_ERROR_CHECK(adc1_config_channel_atten(VIN_BATT_PIN, ADC_ATTEN_11db));
 
+    this->setupLightningSensor();
+
     // setup gpio for wind speed, rain, and lightning sensors
 
     log_d("setting gpio outputs.");
@@ -445,6 +455,26 @@ void Wesp_Sensors_Class::init(GPS_Timestamp_t ts) {
     this->atmosphericSensor->setMode(MODE_SLEEP);
     WU_ReleaseI2cLock();
     log_i("Weather sensors initialiized.");
+}
+
+void Wesp_Sensors_Class::setupLightningSensor() {
+    if (this->lightningSensorAvailable) {
+        log_w("Lightning sensor was already setup.");
+    }
+
+    if (!lightningSensor.beginSPI(LIGHTNING_CS_PIN)) {
+        log_e("Failed to setup the lightning sensor.");
+    }
+    log_i("Lightning sensor setup, configuring now...");
+
+    lightningSensor.maskDisturber(LIGHTNING_MASK_DISTURBERS);
+    lightningSensor.setIndoorOutdoor(OUTDOOR);
+    lightningSensor.setNoiseLevel(LIGHTNING_NOISE_FLOOR);
+    lightningSensor.watchdogThreshold(LIGHTNING_WATCH_DOG_VAL);
+    lightningSensor.spikeRejection(LIGHTNING_SPIKE); 
+    lightningSensor.lightningThreshold(LIGHTNING_THRESHOLD);
+
+    log_i("Lightning sensor configured.");
 }
 
 void Wesp_Sensors_Class::startSensorInterrupts() {
@@ -576,7 +606,20 @@ void Wesp_Sensors_Class::windSpdEventWaitTimeout() {
 }
 
 void Wesp_Sensors_Class::handleLightningItr(bool level, TickType_t tickstamp) {
+    this->lastLightningEvent.type = (Lightning_Event_Type) lightningSensor.readInterruptReg();
+    this->lastLightningEvent.distanceKm = lightningSensor.distanceToStorm();
+    this->lastLightningEvent.energy = lightningSensor.lightningEnergy();
+    if (this->lastLightningEvent.type == Lightning_Event_Type::LIGHTNING_E) {
+        log_i("Lightning detected: %d km away with %d energy.", this->lastLightningEvent.distanceKm, this->lastLightningEvent.energy);
+    }
+    else if (this->lastLightningEvent.type == Lightning_Event_Type::DISTURBUER_E) {
+        log_w("Lightning disturber detected.");
+    }
+    else {
+        log_w("Lightning noise detected.");
+    }
 
+    this->newLightningEventToSend = true;
 }
 
 void Wesp_Sensors_Class::handleSolarChargeItr(bool level, TickType_t tickstamp) {
@@ -619,6 +662,11 @@ void Wesp_Sensors_Class::updateWeatherDataTaskLoop() {
 
         // wind and wind dir avgs get updated every WEATHER_DATA_UPDATE_PERIOD_MS 
         Wesp_Sensors.updateWindData();
+
+        if (newLightningEventToSend) {
+            this->sendLightningEvent(); 
+            newLightningEventToSend = false;
+        }
 
         // look for a second to have passed
         if (curTimestamp - lastSecondTimestamp >= 1000) {
@@ -810,6 +858,26 @@ void Wesp_Sensors_Class::reportWeatherData() {
     serializeJson(jsonOutDoc, jsonStr, 1024);
 
     Wesp_MQTT.sendData(Wesp_Config.getWxTopic(), jsonStr);
+}
+
+void Wesp_Sensors_Class::sendLightningEvent() {
+    if (!this->lightningSensorAvailable) {
+        return;
+    }
+
+    sprintf(this->timestampStr, "%d-%02d-%02d %02d:%02d:%02d", this->year, this->month, this->day, this->cur_hour, this->cur_min, this->cur_sec);
+    
+    DynamicJsonDocument jsonOutDoc(JSON_OBJECT_SIZE(4));
+    jsonOutDoc["dateutc"] = this->timestampStr; 
+    jsonOutDoc["lt"] = this->lastLightningEvent.type;
+    jsonOutDoc["le"] = this->lastLightningEvent.energy;
+    jsonOutDoc["ldkm"] = this->lastLightningEvent.distanceKm;
+
+    char jsonStr[255];
+
+    serializeJson(jsonOutDoc, jsonStr, 255);
+
+    Wesp_MQTT.sendData(Wesp_Config.getWxLightningTopic(), jsonStr);
 }
 
 bool Wesp_Sensors_Class::wakeAtmosphericWaitForMeasurement() {
