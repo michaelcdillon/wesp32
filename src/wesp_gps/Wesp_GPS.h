@@ -2,7 +2,7 @@
 #define Wesp_GPS_H
 
 #include "freertos/FreeRTOS.h"
-#include <SparkFun_Ublox_Arduino_Library.h>
+#include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 
 #define GPS_COORDS_DIVISOR 10000000.0
 #define GPS_ALT_DIVISOR 1000.0
@@ -18,7 +18,7 @@ typedef struct GPS_Timestmap {
 
 class Wesp_GPS_Class {
     private:
-        SFE_UBLOX_GPS gps; 
+        SFE_UBLOX_GNSS gps; 
         bool peripherialAvailable;
         bool fixed;
         uint8_t fixType;

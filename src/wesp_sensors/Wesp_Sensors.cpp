@@ -22,16 +22,16 @@
 #define RAIN_EVENT_INCREMENT_MM 0.2794 // 1 bucket dump in the rain sensor is 0.2794mm of precip
 #define WIND_SPD_DEBOUNCE_MS 10
 #define RAIN_DEBOUNCE_MS 50
-#define WEATHER_DATA_UPDATE_PERIOD_MS 100
+#define WEATHER_DATA_UPDATE_PERIOD_MS 1000
 #define ATMOSPHERIC_SENSOR_WAIT_UNTIL_MEASSURING_START_P_MS  1 
 #define ATMOSPHERIC_SENSOR_WAIT_UNTIL_MEASSURING_FINISH_P_MS  3
-#define REPORT_TIME_INTERVAL_SLOW_MS 60000
+#define REPORT_TIME_INTERVAL_SLOW_MS 15000
 #define REPORT_TIME_INTERVAL_FAST_MS 5000
 #define CALC_WX_DATA_INTERVAL_MS 1000
 #define WIND_SPEED_FAST_REPORTING_THRESHOLD_KMPH 20.0
 
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<WIND_SPD_PIN) | (1ULL<<RAIN_PIN) | (1ULL<<LIGHTNING_ITR_PIN) | (1ULL<<VIN_BATT_PIN) | (1ULL<<SOLAR_CHARGE_PIN) | (1ULL<<SOLAR_FAULT_PIN))
-#define GPIO_OUTPUT_PIN_SEL 0
+#define GPIO_OUTPUT_PIN_SEL ((1ULL<<STAT_LED_PIN))
 
 #define NUM_BATT_VIN_ADC_SAMPLES 5
 #define NUM_WIND_DIR_ADC_SAMPLES 5
@@ -365,7 +365,7 @@ void Wesp_Sensors_Class::resetCountersForNewDay() {
     }
 }
 
-void Wesp_Sensors_Class::init(GPS_Timestamp_t ts) {
+void Wesp_Sensors_Class::init(Wesp_Time* dateTime) {
     log_d("Wind dir settings:");
     for (uint8_t i = 0; i < NUM_WIND_DIRS; i++) {
         Wind_Dir_t* dir = &Wind_Dirs[i];
@@ -436,12 +436,12 @@ void Wesp_Sensors_Class::init(GPS_Timestamp_t ts) {
     sensorEventQueue = xQueueCreate(50, sizeof(SensorEvent_t));
 
     // set the time
-    this->year = ts.year;
-    this->month = ts.month;
-    this->day = ts.day;
-    this->cur_hour = ts.hour;
-    this->cur_min = ts.minute;
-    this->cur_sec = ts.second;
+    this->year = dateTime->year;
+    this->month = dateTime->month;
+    this->day = dateTime->day;
+    this->cur_hour = dateTime->hour;
+    this->cur_min = dateTime->minute;
+    this->cur_sec = dateTime->second;
     this->cur_2m_sec = this->cur_sec;
 
     //install gpio isr service
@@ -685,14 +685,17 @@ void Wesp_Sensors_Class::updateWeatherDataTaskLoop() {
                     this->cur_min = 0;
                     this->cur_hour++;
 
-                    // new hour, lets check the GPS for the current time to correct drift.
-                    GPS_Timestamp_t ts = Wesp_GPS.updateAndFetchCurrentTime();
-                    this->cur_sec = ts.second;
-                    this->cur_min = ts.minute;
-                    this->cur_hour = ts.hour;
-                    this->day = ts.day;
-                    this->month = ts.month;
-                    this->year = ts.year;
+                    // new hour, lets check the GPS or NTP for the current time to correct drift.
+                    Wesp_Time datetime;
+
+                    GetCurrentDateTime(&datetime);
+
+                    this->cur_sec = datetime.second;
+                    this->cur_min = datetime.minute;
+                    this->cur_hour = datetime.hour;
+                    this->day = datetime.day;
+                    this->month = datetime.month;
+                    this->year = datetime.year;
 
                     if (this->cur_hour > 23) {
                         this->cur_hour = 0;
@@ -707,7 +710,7 @@ void Wesp_Sensors_Class::updateWeatherDataTaskLoop() {
 
             if (this->cur_sec % 10 == 0) {
                 float batt_vol = get_batt_vin_v();
-                log_d("Read batt voltage: %f", batt_vol);
+                //log_d("Read batt voltage: %f", batt_vol);
             }
 
             if (curTimestamp - last_calc_wx_timestamp >= CALC_WX_DATA_INTERVAL_MS) {
@@ -758,7 +761,7 @@ void Wesp_Sensors_Class::calcWeatherData() {
     this->pressure = this->atmosphericSensor->readFloatPressure();
     this->barometric_pressure_in = (this->pressure / 10) * 0.295300; // hPa -> kPa -> inHg
     this->dew_point_c = this->atmosphericSensor->dewPointC();
-    log_d("barometer based altitude: %f", this->atmosphericSensor->readFloatAltitudeMeters());
+    //log_d("barometer based altitude: %f", this->atmosphericSensor->readFloatAltitudeMeters());
     WU_ReleaseI2cLock();
 
 	//Calc windspdmph_avg2m
@@ -828,6 +831,7 @@ void Wesp_Sensors_Class::calcWeatherData() {
 
 
 void Wesp_Sensors_Class::reportWeatherData() {
+    gpio_set_level(STAT_LED_PIN, 1);
     sprintf(this->timestampStr, "%d-%02d-%02d %02d:%02d:%02d", this->year, this->month, this->day, this->cur_hour, this->cur_min, this->cur_sec);
 
     DynamicJsonDocument jsonOutDoc(JSON_OBJECT_SIZE(24));
@@ -858,6 +862,7 @@ void Wesp_Sensors_Class::reportWeatherData() {
     serializeJson(jsonOutDoc, jsonStr, 1024);
 
     Wesp_MQTT.sendData(Wesp_Config.getWxTopic(), jsonStr);
+    gpio_set_level(STAT_LED_PIN, 0);
 }
 
 void Wesp_Sensors_Class::sendLightningEvent() {
@@ -865,6 +870,7 @@ void Wesp_Sensors_Class::sendLightningEvent() {
         return;
     }
 
+    gpio_set_level(STAT_LED_PIN, 1);
     sprintf(this->timestampStr, "%d-%02d-%02d %02d:%02d:%02d", this->year, this->month, this->day, this->cur_hour, this->cur_min, this->cur_sec);
     
     DynamicJsonDocument jsonOutDoc(JSON_OBJECT_SIZE(4));
@@ -878,6 +884,7 @@ void Wesp_Sensors_Class::sendLightningEvent() {
     serializeJson(jsonOutDoc, jsonStr, 255);
 
     Wesp_MQTT.sendData(Wesp_Config.getWxLightningTopic(), jsonStr);
+    gpio_set_level(STAT_LED_PIN, 0);
 }
 
 bool Wesp_Sensors_Class::wakeAtmosphericWaitForMeasurement() {

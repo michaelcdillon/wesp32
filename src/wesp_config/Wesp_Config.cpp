@@ -7,8 +7,8 @@
 
 #define UNINITIALIZED_DEVICE_ID "FFFFFFFFFFFF"
 
-static char announceOnMsgJson[100];
-static char announceOffMsgJson[100];
+static char announceOnMsgJson[130];
+static char announceOffMsgJson[130];
 static char announceStationTopic[] = WESP_STATION_ANNOUNCE_TOPIC;
 static char controlTopic[] = WESP_CONTROL_TOPIC;
 static char mqttUri[35];
@@ -21,14 +21,14 @@ Wesp_Config_Class::Wesp_Config_Class() {
 }
 
 void Wesp_Config_Class::setupAll() {
-    // order counts, deviec id is needed by the others, wtx is needed by announce messages
+    // order counts, device id is needed by the others, wtx is needed by announce messages
     this->setupDeviceId();
     this->setupWxTopic();
-    log_i("wxt: %s", this->wxt);
+    log_d("wxt: %s", this->wxt);
     this->setupWxLightningTopic();
-    log_i("wxlt: %s", this->wxlt);
+    log_d("wxlt: %s", this->wxlt);
     this->setupAnnounceMessages();
-    log_i("announce on msg: %s", announceOnMsgJson);
+    log_d("announce on msg: %s", announceOnMsgJson);
 }
 
 void Wesp_Config_Class::setupDeviceId() {
@@ -47,8 +47,8 @@ void Wesp_Config_Class::setupWxLightningTopic() {
 }
 
 void Wesp_Config_Class::setupAnnounceMessages() {
-    DynamicJsonDocument announceOnMsg(JSON_OBJECT_SIZE(10));
-    DynamicJsonDocument announceOffMsg(JSON_OBJECT_SIZE(10));
+    StaticJsonDocument<240> announceOnMsg;
+    StaticJsonDocument<240> announceOffMsg;
     
     announceOnMsg["did"] = this->deviceId;
     announceOffMsg["did"] = this->deviceId;
@@ -56,12 +56,13 @@ void Wesp_Config_Class::setupAnnounceMessages() {
     announceOffMsg["s"] = "off";
     announceOnMsg["fw"] = Wesp_Version.getVersion();
     announceOffMsg["fw"] = Wesp_Version.getVersion();
-    log_i("wxt: %s", this->wxt);
     announceOnMsg["wxt"] = this->wxt;
     announceOffMsg["wxt"] = this->wxt;
+    announceOnMsg["wxlt"] = this->wxlt;
+    announceOffMsg["wxlt"] = this->wxlt;
 
-    serializeJson(announceOnMsg, announceOnMsgJson, 100);
-    serializeJson(announceOffMsg, announceOffMsgJson, 100);
+    serializeJson(announceOnMsg, announceOnMsgJson, 130);
+    serializeJson(announceOffMsg, announceOffMsgJson, 130);
 }
 
 const char* Wesp_Config_Class::getDeviceId() {

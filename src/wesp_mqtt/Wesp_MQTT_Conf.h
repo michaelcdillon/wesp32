@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-esp_mqtt_client_config_t* generate_mqtt_client_conf(const char* uri, const char* username, const char* password);
+esp_mqtt_client_config_t* generate_mqtt_client_conf(const char* uri, const char* username, const char* password, const char* certPem, size_t certLen);
 
 #ifdef __cplusplus
 }

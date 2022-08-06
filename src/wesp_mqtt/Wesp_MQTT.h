@@ -8,6 +8,8 @@ extern void SendMqttDataTask(void* arg);
 
 class Wesp_MQTT_Class {
     private:
+        bool initialized;
+        bool connected;
         esp_mqtt_client_config_t* mqtt_cfg;
         esp_event_loop_handle_t event_loop_handle;
         esp_mqtt_client_handle_t mqtt_client;
@@ -18,6 +20,8 @@ class Wesp_MQTT_Class {
         void start();
         void stop();
         void sendData(const char* topic, const char* data);
+        bool isConnected();
+        void setConnected(bool status);
 };
 
 extern Wesp_MQTT_Class Wesp_MQTT;

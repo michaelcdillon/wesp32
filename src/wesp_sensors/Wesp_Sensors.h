@@ -12,6 +12,7 @@
 #include "ArduinoJson.h"
 #include "wesp_gps/Wesp_GPS.h"
 #include "SparkFun_AS3935.h"
+#include "wesp_time/Wesp_Time.h"
 
 #define SOIL_MST_PIN        (GPIO_NUM_34)     // MM A0 = ESP32 GPI34/ADC1:6
 #define SOIL_PWR_PIN        (GPIO_NUM_15)     // MM G0 = ESP32 GPIO15/ADC2:3
@@ -23,6 +24,7 @@
 #define LIGHTNING_ITR_PIN   (GPIO_NUM_17)     // MM G3/B3 = ESP32 GPIO17
 #define LIGHTNING_CS_PIN    (GPIO_NUM_25)     // MM G1/B1 = ESP32 GPIO17
 #define VIN_BATT_PIN        (ADC1_CHANNEL_3)  // MM BATT_VIN/3 = ESP32 GPI39/ADC1:3
+#define STAT_LED_PIN        (GPIO_NUM_2)
 #define VIN_BATT_MULTIPLIER 3
 
 enum Wind_Dir_Nice {
@@ -134,7 +136,7 @@ class Wesp_Sensors_Class {
 
     public:
         Wesp_Sensors_Class();
-        void init(GPS_Timestamp_t ts);
+        void init(Wesp_Time* datetime);
         volatile Wind_Dir_t* getWindDir();
         float get_wind_speed_kmph();
         void stopSensorInterrupts();

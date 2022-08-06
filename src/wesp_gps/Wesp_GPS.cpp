@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include "Wesp_GPS.h"
 #include "utils/Wesp_Utils.h"
-#include <SparkFun_Ublox_Arduino_Library.h>
 
 #define WAIT_TIME_FOR_GPS_POWER_SAVE_MODE 2000
 

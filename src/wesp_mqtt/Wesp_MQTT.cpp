@@ -10,6 +10,8 @@
 #include "wesp_config/Wesp_Config.h"
 #include <string.h>
 
+extern const char isrg_root_x1_pem_start[] asm("_binary_src_certs_isrg_x1_pem_start");
+extern const char isrg_root_x1_pem_end[] asm("_binary_src_certs_isrg_x1_pem_end");
 
 #define DATA_TO_BROADCAST_QUEUE_SIZE 100
 
@@ -76,9 +78,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         log_i("sent subscribe successful, msg_id=%d", msg_id);
 
         esp_mqtt_client_publish(client, Wesp_Config.getAnnounceStationTopic(), Wesp_Config.getAnnounceOnMessage(), strlen(Wesp_Config.getAnnounceOnMessage()), 0, 0);
+        Wesp_MQTT.setConnected(true);
         break;
     case MQTT_EVENT_DISCONNECTED:
         log_i("MQTT_EVENT_DISCONNECTED");
+        Wesp_MQTT.setConnected(false);
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -137,29 +141,51 @@ Wesp_MQTT_Class::Wesp_MQTT_Class() {
     ESP_ERROR_CHECK(esp_tls_init_global_ca_store());
     ESP_ERROR_CHECK(esp_tls_set_global_ca_store((const unsigned char*) ca_certs, root_len + machine_len));
     */
+
+   this->initialized = false;
+   this->connected = false;
 }
 
 void Wesp_MQTT_Class::init(const char* mqtt_uri, const char* username, const char* password) {
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    dataToBroadcastQueue = xQueueCreate(DATA_TO_BROADCAST_QUEUE_SIZE, sizeof(BroadcastData_t));
 
-    this->mqtt_cfg = generate_mqtt_client_conf(mqtt_uri, username, password);
+    //ESP_ERROR_CHECK(esp_event_loop_create_default()); // likely not needed any more
+
+    this->mqtt_cfg = generate_mqtt_client_conf(mqtt_uri, username, password, isrg_root_x1_pem_start, 1923);
 
     this->mqtt_client = esp_mqtt_client_init(this->mqtt_cfg);
+
+    if (this->mqtt_client == NULL) {
+        log_e("Failed to initialize the mqtt client, the mqtt cfg is likely setup incorrectly.");
+        return;
+    }
+
     ESP_ERROR_CHECK(esp_mqtt_client_register_event(this->mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, this->mqtt_client));
 
-    dataToBroadcastQueue = xQueueCreate(DATA_TO_BROADCAST_QUEUE_SIZE, sizeof(BroadcastData_t));
+    this->initialized = true;
+    log_i("mqtt client initialized.");
 }
 
 void Wesp_MQTT_Class::start() {
+    if (!this->initialized) {
+        return;
+    }
     ESP_ERROR_CHECK(esp_mqtt_client_start(this->mqtt_client));
 
+    log_i("mqtt client started.");
 }
 
 void Wesp_MQTT_Class::stop() {
+    if (!this->initialized) {
+        return;
+    }
     ESP_ERROR_CHECK(esp_mqtt_client_stop(this->mqtt_client));
 }
 
 void Wesp_MQTT_Class::sendData(const char* topic, const char* data) {
+    if (!this->initialized) {
+        return;
+    }
     BroadcastData broadcastData = {
         this->mqtt_client,
         topic,
@@ -167,6 +193,14 @@ void Wesp_MQTT_Class::sendData(const char* topic, const char* data) {
     };
 
     xQueueSendToBack(dataToBroadcastQueue, &broadcastData, 5);
+}
+
+void Wesp_MQTT_Class::setConnected(bool status) {
+    this->connected = status;
+}
+
+bool Wesp_MQTT_Class::isConnected() {
+    return this->connected;
 }
 
 Wesp_MQTT_Class Wesp_MQTT;
