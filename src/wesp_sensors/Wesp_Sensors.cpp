@@ -95,15 +95,17 @@
 #define WIND_DIR_DEG_337_5_MV_MIN (CALC_WIND_DIR_DEG_MV_MIN(WIND_DIR_DEG_337_5_R, DEG_R_RESISTOR_TOLERANCE))
 #define WIND_DIR_DEG_337_5_MV_MAX (CALC_WIND_DIR_DEG_MV_MAX(WIND_DIR_DEG_337_5_R, DEG_R_RESISTOR_TOLERANCE))
 
-#define LIGHTNING_MASK_DISTURBERS true
-#define LIGHTNING_NOISE_FLOOR 2
+#define LIGHTNING_MASK_DISTURBERS true 
+#define LIGHTNING_NOISE_FLOOR 3
 #define LIGHTNING_WATCH_DOG_VAL 2
 #define LIGHTNING_SPIKE 2
-#define LIGHTNING_THRESHOLD 1
+#define LIGHTNING_THRESHOLD 2
 
 static esp_adc_cal_characteristics_t adc1_chars;
 
 SparkFun_AS3935 lightningSensor;
+StaticJsonDocument<110> lightningJsonOutDoc;
+char lightningJsonStr[110];
 
 Wind_Dir_t Wind_Dirs[NUM_WIND_DIRS] = {
     {
@@ -328,6 +330,7 @@ Wesp_Sensors_Class::Wesp_Sensors_Class() {
     this->solar_charge = false;
     this->solar_fault = false;
     this->reportWeatherDataDelay = REPORT_TIME_INTERVAL_FAST_MS;  // fast to start so reporting is immediate
+    this->lightningSensorAvailable = false;
     
     this->resetCountersForNewDay();
 }
@@ -475,6 +478,7 @@ void Wesp_Sensors_Class::setupLightningSensor() {
     lightningSensor.lightningThreshold(LIGHTNING_THRESHOLD);
 
     log_i("Lightning sensor configured.");
+    this->lightningSensorAvailable = true;
 }
 
 void Wesp_Sensors_Class::startSensorInterrupts() {
@@ -606,20 +610,20 @@ void Wesp_Sensors_Class::windSpdEventWaitTimeout() {
 }
 
 void Wesp_Sensors_Class::handleLightningItr(bool level, TickType_t tickstamp) {
-    this->lastLightningEvent.type = (Lightning_Event_Type) lightningSensor.readInterruptReg();
-    this->lastLightningEvent.distanceKm = lightningSensor.distanceToStorm();
-    this->lastLightningEvent.energy = lightningSensor.lightningEnergy();
-    if (this->lastLightningEvent.type == Lightning_Event_Type::LIGHTNING_E) {
+    Lightning_Event_Type type = (Lightning_Event_Type) lightningSensor.readInterruptReg();
+    if (type == Lightning_Event_Type::LIGHTNING_E) {
         log_i("Lightning detected: %d km away with %d energy.", this->lastLightningEvent.distanceKm, this->lastLightningEvent.energy);
+        this->lastLightningEvent.type = type;
+        this->lastLightningEvent.distanceKm = lightningSensor.distanceToStorm();
+        this->lastLightningEvent.energy = lightningSensor.lightningEnergy();
+        this->newLightningEventToSend = true;
     }
-    else if (this->lastLightningEvent.type == Lightning_Event_Type::DISTURBUER_E) {
+    else if (type == Lightning_Event_Type::DISTURBUER_E) {
         log_w("Lightning disturber detected.");
     }
     else {
         log_w("Lightning noise detected.");
     }
-
-    this->newLightningEventToSend = true;
 }
 
 void Wesp_Sensors_Class::handleSolarChargeItr(bool level, TickType_t tickstamp) {
@@ -633,14 +637,14 @@ void Wesp_Sensors_Class::handleSolarFaultItr(bool level, TickType_t tickstamp) {
 }
 
 void Wesp_Sensors_Class::setSolarStatus() {
-    if (!this->solar_charge && !this->solar_fault) {
+    if (this->solar_charge && this->solar_fault) {
         this->solar_status = Solar_Status::OK_NOT_CHARGING;
-    } else if (!this->solar_charge && this->solar_fault) {
-        this->solar_status = Solar_Status::BAD_BATTERY_FAULT;
     } else if (this->solar_charge && !this->solar_fault) {
-        this->solar_status = Solar_Status::OK_CHARGING;
-    } else if (this->solar_charge && this->solar_fault) {
         this->solar_status = Solar_Status::OK_CHARGING_PAUSED_TEMP;
+    } else if (!this->solar_charge && this->solar_fault) {
+        this->solar_status = Solar_Status::OK_CHARGING;
+    } else if (this->solar_charge == this->solar_fault) {
+        this->solar_status = Solar_Status::BAD_BATTERY_FAULT;
     } else {
         this->solar_status = Solar_Status::UNKNOWN;
     }
@@ -872,18 +876,17 @@ void Wesp_Sensors_Class::sendLightningEvent() {
 
     gpio_set_level(STAT_LED_PIN, 1);
     sprintf(this->timestampStr, "%d-%02d-%02d %02d:%02d:%02d", this->year, this->month, this->day, this->cur_hour, this->cur_min, this->cur_sec);
-    
-    DynamicJsonDocument jsonOutDoc(JSON_OBJECT_SIZE(4));
-    jsonOutDoc["dateutc"] = this->timestampStr; 
-    jsonOutDoc["lt"] = this->lastLightningEvent.type;
-    jsonOutDoc["le"] = this->lastLightningEvent.energy;
-    jsonOutDoc["ldkm"] = this->lastLightningEvent.distanceKm;
+    log_d("timestamp str: %s", this->timestampStr);
+    lightningJsonOutDoc["dateutc"] = this->timestampStr; 
+    lightningJsonOutDoc["lt"] = this->lastLightningEvent.type;
+    lightningJsonOutDoc["le"] = this->lastLightningEvent.energy;
+    lightningJsonOutDoc["ldkm"] = this->lastLightningEvent.distanceKm;
 
-    char jsonStr[255];
+    serializeJson(lightningJsonOutDoc, lightningJsonStr, 110);
 
-    serializeJson(jsonOutDoc, jsonStr, 255);
+    log_d("lightning json message: %s", lightningJsonStr);
 
-    Wesp_MQTT.sendData(Wesp_Config.getWxLightningTopic(), jsonStr);
+    Wesp_MQTT.sendData(Wesp_Config.getWxLightningTopic(), lightningJsonStr);
     gpio_set_level(STAT_LED_PIN, 0);
 }
 
